@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Exchange Web Services Autodiscover implementation.
  *
@@ -9,6 +10,9 @@
 namespace PhpEws;
 
 use XMLWriter;
+use Zend\Ldap\Ldap;
+use Zend\Ldap\Exception\LdapException;
+use Psr\Log\LoggerInterface;
 
 /**
  * Exchange Web Services Autodiscover implementation
@@ -81,6 +85,13 @@ class EWSAutodiscover
      * @todo We do not currently support this.
      */
     const AUTODISCOVERED_VIA_RESPONSE_REDIRECT = 14;
+
+    /**
+     * Server was discovered using the AD SCP method.
+     *
+     * @var integer
+     */
+    const AUTODISCOVERED_VIA_AD = 15;
 
     /**
      * The email address to attempt autodiscovery against.
@@ -184,6 +195,15 @@ class EWSAutodiscover
      * @var integer
      */
     public $connection_timeout = 2;
+    
+    /**
+     * The default value in seconds to use for cURL request timeouts. This will
+     * be used for any requests that do not explicitly define their own timeout. 
+     * Default timeout is 6 seconds.
+     * 
+     * @var integer
+     */
+    public  $default_curl_timeout = 6;
 
     /**
      * Information about an Autodiscover Response containing an error will 
@@ -208,6 +228,14 @@ class EWSAutodiscover
      * @var mixed
      */
     public $discovered = null;
+    
+    /**
+     * Handle to logger implementing PSR-3 interface
+     * @link https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-3-logger-interface.md
+     * 
+     * @var Psr\Log\LoggerInterface;
+     */
+    protected $logger = null;
 
     /**
      * Constructor for the EWSAutodiscover class. 
@@ -237,7 +265,11 @@ class EWSAutodiscover
      */
     public function discover()
     {
-        $result = $this->tryTLD();
+        $result = $this->tryAdScp();
+
+        if ($result === false) {
+            $result = $this->tryTLD();
+        }
 
         if ($result === false) {
             $result = $this->trySubdomain();
@@ -249,6 +281,10 @@ class EWSAutodiscover
 
         if ($result === false) {
             $result = $this->trySRVRecord();
+        }
+        
+        if($result === false) {
+        	$this->discovered = false;
         }
 
         return $result;
@@ -413,6 +449,69 @@ class EWSAutodiscover
     }
 
     /** 
+     * Autodiscover URLs by performing an Active Directory Service Connection
+     * Point (SCP) record lookup.
+     *
+     * @return An AUTODISCOVERED_VIA_* constant or FALSE on failure.
+     */
+    public function tryAdScp()
+    {
+        $ldapOptions = array();
+        $ldapOptions['host'] = $this->tld;
+        $ldapOptions['accountDomainName'] = $this->tld;
+        $ldapOptions['username'] = $this->username;
+        $ldapOptions['password'] = $this->password;
+
+        $ldap = new Ldap( $ldapOptions );
+
+        try
+        {
+           $ldap->bind();
+        }
+        catch(LdapException $e)
+        {
+        	$this->warning('Unable to autodiscover via LDAP', array('host' => $ldapOptions['host']));
+        	return false;
+        }
+
+        $rootDse = $ldap->getRootDse();
+        $configurationNamingContext = $rootDse->getConfigurationNamingContext();
+
+        // Search string  provided at @link http://msdn.microsoft.com/en-us/library/ee332364%28v=exchg.140%29.aspx
+        $results = $ldap->search("(&(objectClass=serviceConnectionPoint)(|(keywords=67661d7F-8FC4-4fa7-BFAC-E1D7794C1F68)(keywords=77378F46-2C66-4aa9-A6A6-3E7A48B19596)))", $configurationNamingContext, Ldap::SEARCH_SCOPE_SUB );
+
+        $resultsArray = $results->toArray();
+
+        $urls = array();
+        foreach ( $resultsArray as $server )
+        {
+            foreach ( $server['servicebindinginformation'] as $url )
+            {
+                // Don't check the same url more than once
+                if (!in_array( $url, $urls ))
+                {
+                    $urls[] = $url;
+                }
+            }
+        }
+
+        // Try each provided URL and break on success
+        foreach($urls as $url)
+        {
+            $result = $this->doNTLMPost($url, 5);
+            if ($result)
+            {
+                return self::AUTODISCOVERED_VIA_AD;
+                break;
+            }
+            $this->info('AD, trying: '.$url);
+        }
+
+        $this->warning('Connected to AD, but did not successfully find a valid connection');
+        return false;
+    }
+
+    /** 
      * Perform an NTLM authenticated HTTPS POST to the top-level 
      * domain of the email address. 
      *
@@ -426,6 +525,7 @@ class EWSAutodiscover
             return self::AUTODISCOVERED_VIA_TLD;
         }
 
+        $this->warning('Unable to autodiscover via TLD', array('url' => $url));
         return false;
     }
 
@@ -443,6 +543,7 @@ class EWSAutodiscover
             return self::AUTODISCOVERED_VIA_SUBDOMAIN;
         }
 
+        $this->warning('Unable to autodiscover via subdomain', array('url' => $url));
         return false;
     }
 
@@ -481,7 +582,7 @@ class EWSAutodiscover
         ) {
             // Do the NTLM POST to the redirect.
             $result = $this->doNTLMPost(
-                $this->last_response_headers['location']
+                $this->last_info['redirect_url']
             );
 
             if ($result) {
@@ -489,6 +590,7 @@ class EWSAutodiscover
             }
         }
 
+        $this->warning('Unable to autodiscover via subdomain unauthenticated get', array('url' => $url));
         return false;
     }
 
@@ -511,6 +613,7 @@ class EWSAutodiscover
             }
         }
 
+        $this->warning('Unable to autodiscover via SRV record', array('srvhost' => $srvhost));
         return false;
     }
 
@@ -566,30 +669,33 @@ class EWSAutodiscover
      * @param integer $timeout Overall cURL timeout for this request
      * @return boolean
      */
-    public function doNTLMPost($url, $timeout = 6)
+    public function doNTLMPost($url, $timeout = null)
     {
         $this->reset();
-
+        if($timeout === null) {
+        	$timeout = $this->default_curl_timeout;
+        }
+		
         $ch = curl_init();
         $opts = array(
             CURLOPT_URL             => $url,
-            CURLOPT_HTTPAUTH        => CURLAUTH_NTLM,
+            CURLOPT_HTTPAUTH        => CURLAUTH_NTLM | CURLAUTH_BASIC,
             CURLOPT_CUSTOMREQUEST   => 'POST',
             CURLOPT_POSTFIELDS      => $this->getAutoDiscoverRequest(),
             CURLOPT_RETURNTRANSFER  => true,
             CURLOPT_USERPWD         => $this->username.':'.$this->password,
             CURLOPT_TIMEOUT         => $timeout,
             CURLOPT_CONNECTTIMEOUT  => $this->connection_timeout,
-            CURLOPT_FOLLOWLOCATION  => true,
+            CURLOPT_FOLLOWLOCATION  => false,
             CURLOPT_HEADER          => false,
             CURLOPT_HEADERFUNCTION  => array($this, 'readHeaders'),
             CURLOPT_IPRESOLVE       => CURL_IPRESOLVE_V4,
             CURLOPT_SSL_VERIFYPEER  => true,
-            CURLOPT_SSL_VERIFYHOST  => true,
+            CURLOPT_SSL_VERIFYHOST  => true
         );
 
-        // Set the appropriate content-type.
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: text/xml; charset=utf-8'));
+        // Set the appropriate content-type and content size.
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: text/xml; charset=utf-8', 'Content-Length: ' . strlen($this->requestxml)));
 
         if (! empty($this->cainfo)) {
             $opts[CURLOPT_CAINFO] = $this->cainfo;
@@ -610,13 +716,38 @@ class EWSAutodiscover
         $this->last_curl_errno  = curl_errno($ch);
         $this->last_curl_error  = curl_error($ch);
 
-        if ($this->last_curl_errno != CURLE_OK) {
-            return false;
+        $this->info('NTLM post', array('curl options' => $opts));
+        $this->info('Performed NTLM post', array('last_response' => $this->last_response, 'last_info' => $this->last_info, 'last_error' => $this->last_curl_error));
+        
+        // Follow redirects
+        if (
+            $this->last_info['http_code'] == 302
+            || $this->last_info['http_code'] == 301
+        ) {
+            // Do the NTLM POST to the redirect.
+            $this->info('NTLM post, about to follow redirect',
+            		array
+            		(
+            			'http_code' => $this->last_info['http_code'],
+            			'redirect_url' => $this->last_info['redirect_url']
+            		)
+            );
+        	$discovered = $this->doNTLMPost(
+                $this->last_info['redirect_url']
+            );
+            return $discovered;
         }
+        else
+        {
 
-        $discovered = $this->parseAutodiscoverResponse();
+            if ($this->last_curl_errno != CURLE_OK) {
+                return false;
+            }
 
-        return $discovered;
+            $discovered = $this->parseAutodiscoverResponse();
+
+            return $discovered;
+        }
     }
 
     /**
@@ -819,5 +950,54 @@ class EWSAutodiscover
 
         return $output;
     }
-
+    
+    /**
+     * Set logger
+     * 
+     * @param LoggerInterface $logger
+     */
+    public function setLogger(LoggerInterface $logger)
+    {
+    	$this->logger = $logger;
+    }
+    
+    protected function debug($message, array $context = array())
+    {
+    	if ($this->logger !== null)
+    	{
+    		$this->logger->debug($message, $context);
+    	}
+    }
+    
+    protected function info($message, array $context = array())
+    {
+    	if ($this->logger !== null)
+    	{
+    		$this->logger->info($message, $context);
+    	}
+    }
+    
+    protected function warning($message, array $context = array())
+    {
+    	if ($this->logger !== null)
+    	{
+    		$this->logger->warning($message, $context);
+    	}
+    }
+    
+    protected function error($message, array $context = array())
+    {
+    	if ($this->logger !== null)
+    	{
+    		$this->logger->error($message, $context);
+    	}
+    }
+    
+    protected function critical($message, array $context = array())
+    {
+    	if ($this->logger !== null)
+    	{
+    		$this->logger->critical($message, $context);
+    	}
+    }
 }

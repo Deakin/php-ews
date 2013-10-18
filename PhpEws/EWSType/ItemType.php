@@ -8,6 +8,8 @@
 
 namespace PhpEws\EWSType;
 
+use   PhpEws\EWSType\EWSType;
+
 /**
  * Definition of the ItemType type
  */
