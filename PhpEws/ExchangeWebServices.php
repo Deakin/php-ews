@@ -62,6 +62,13 @@ class ExchangeWebServices
      * @var string
      */
     const VERSION_2010_SP2 = 'Exchange2010_SP2';
+    
+    /**
+     * Microsoft Exchange 2013
+     *
+     * @var string
+     */
+    const VERSION_2013 = 'Exchange2013';
 
     /**
      * Password to use when connecting to the Exchange server.
@@ -700,8 +707,9 @@ class ExchangeWebServices
      */
     protected function initializeSoapClient()
     {
+        $serviceVersion = ($this->version == self::VERSION_2013) ? '2013.' : '';
         $this->soap = new Exchange(
-            dirname(__FILE__).'/wsdl/services.wsdl',
+            dirname(__FILE__).'/wsdl/'.$serviceVersion.'services.wsdl',
             array(
                 'user' => $this->username,
                 'password' => $this->password,
