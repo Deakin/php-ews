@@ -372,12 +372,13 @@ class EWSAutodiscover
                     return ExchangeWebServices::VERSION_2010;
             }
         } elseif ($majorversion == 15) {
+            //Force 2010
             switch ($minorversion) {
                 case 0:
-                    return ExchangeWebServices::VERSION_2013;
+                    return ExchangeWebServices::VERSION_2010_SP2;
                     break;
                 default:
-                    return ExchangeWebServices::VERSION_2013;
+                    return ExchangeWebServices::VERSION_2010_SP2;
             }
         }
 
