@@ -2537,7 +2537,8 @@
 
   <xs:complexType name="TimeZoneDefinitionType">
     <xs:sequence minOccurs="0">
-      <xs:element name="Periods" type="t:NonEmptyArrayOfPeriodsType" />
+      <!-- Adding minOccurs = 0 to Periods, as phpEws will add it even when no periods are required -->
+      <xs:element name="Periods" type="t:NonEmptyArrayOfPeriodsType" minOccurs="0"/>
       <xs:element name="TransitionsGroups" type="t:ArrayOfTransitionsGroupsType"   minOccurs="0"/>
       <xs:element name="Transitions" type="t:ArrayOfTransitionsType" minOccurs="0" />
     </xs:sequence>
