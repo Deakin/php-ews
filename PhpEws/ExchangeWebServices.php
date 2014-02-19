@@ -743,4 +743,32 @@ class ExchangeWebServices
 
         return $response;
     }
+    
+    /**
+     * The GetUserConfiguration operation gets a user configuration object on a folder.
+     *
+     * @param GetUserConfiguration $request
+     * @return GetUserConfigurationResponse
+     */
+    public function GetUserConfiguration($request)
+    {
+        $this->initializeSoapClient();
+        $response = $this->soap->{__FUNCTION__}($request);
+
+        return $this->processResponse($response);
+    }
+    
+    /**
+     * The UpdateUserConfiguration operation updates a user configuration object on a folder.
+     *
+     * @param UpdateUserConfiguration $request
+     * @return UpdateUserConfigurationResponse
+     */
+    public function UpdateUserConfiguration($request)
+    {
+        $this->initializeSoapClient();
+        $response = $this->soap->{__FUNCTION__}($request);
+
+        return $this->processResponse($response);
+    }
 }
