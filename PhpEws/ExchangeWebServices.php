@@ -771,4 +771,18 @@ class ExchangeWebServices
 
         return $this->processResponse($response);
     }
+
+    /**
+     * The CreateUserConfiguration operation creates a user configuration object on a folder.
+     *
+     * @param CreateUserConfiguration $request
+     * @return CreateUserConfigurationResponse
+     */
+    public function CreateUserConfiguration($request)
+    {
+        $this->initializeSoapClient();
+        $response = $this->soap->{__FUNCTION__}($request);
+
+        return $this->processResponse($response);
+    }
 }
