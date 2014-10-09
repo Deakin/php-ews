@@ -246,7 +246,8 @@ class EWSAutodiscover
      */
     public function __construct($email, $password, $username = null)
     {
-        $this->email = $email;
+        $this->setEmail($email);
+
         $this->password = $password;
         if ($username === null) {
             $this->username = $email;
@@ -256,6 +257,18 @@ class EWSAutodiscover
 
         $this->setTLD();
     }
+
+    /**
+     * Set's the email to perform the discovery on
+     *
+     * @param string $email
+    */
+    public function setEmail($email)
+    {
+        $this->email = $email;
+        $this->setTLD();
+    }
+
 
     /**
      * Execute the full discovery chain of events in the correct sequence
@@ -285,6 +298,15 @@ class EWSAutodiscover
         
         if($result === false) {
         	$this->discovered = false;
+        }
+
+        // Follow any redirects
+        if($this->redirect)
+        {
+            $email = $redirectAddr = $this->redirect['redirectAddr'];
+            $this->redirect = false;
+            $this->setEmail($email);
+            return $this->discover();
         }
 
         return $result;
@@ -783,13 +805,13 @@ class EWSAutodiscover
         switch ($response['Account']['Action']) {
             case 'redirectUrl':
                 $this->redirect = array(
-                    'redirectUrl' => $response['Account']['redirectUrl']
+                    'redirectUrl' => $response['Account']['RedirectUrl']
                 );
                 return false;
                 break;
             case 'redirectAddr':
                 $this->redirect = array(
-                    'redirectAddr' => $response['Account']['redirectAddr']
+                    'redirectAddr' => $response['Account']['RedirectAddr']
                 );
                 return false;
                 break;
