@@ -266,6 +266,7 @@ class EWSAutodiscover
     public function setEmail($email)
     {
         $this->email = $email;
+        $this->requestxml = null;
         $this->setTLD();
     }
 
