@@ -46,7 +46,22 @@ class NTLMSoapClient extends SoapClient
      *
      * @var boolean
      */
+
     protected $validate = false;
+
+    /**
+     * Timeout value for curl in seconds
+     * 
+     * @var int 
+     */
+    protected $timeout_seconds = 5;
+
+    /**
+     * Timeout value for curl in milliseconds
+     * 
+     * @var int 
+     */
+    protected $timeout_ms = 0;
 
     /**
      * Performs a SOAP request
@@ -82,6 +97,8 @@ class NTLMSoapClient extends SoapClient
         curl_setopt($this->ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
         curl_setopt($this->ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC | CURLAUTH_NTLM);
         curl_setopt($this->ch, CURLOPT_USERPWD, $this->user.':'.$this->password);
+        curl_setopt($this->ch, CURLOPT_TIMEOUT_MS, $this->timeout_ms + ($this->timeout_seconds * 1000));
+
 
         $response = curl_exec($this->ch);
 
