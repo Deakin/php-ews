@@ -222,6 +222,20 @@ class EWSAutodiscover
     public $redirect = false;
 
     /**
+     * Number of redirections in current discovery
+     *
+     * @var int
+     */
+    public $redirectCount = 0;
+
+    /**
+     * Maximum number of redirects to attempt
+     *
+     * @var int
+     */
+    public $maxRedirects = 5;
+
+    /**
      * A successful, non-error and non-redirect parsed Autodiscover response
      * will be stored here.
      *
@@ -271,7 +285,6 @@ class EWSAutodiscover
         $this->setTLD();
     }
 
-
     /**
      * Execute the full discovery chain of events in the correct sequence
      * until a valid response is received, or all methods have failed.
@@ -279,6 +292,21 @@ class EWSAutodiscover
      * @return An AUTODISCOVERED_VIA_* constant or FALSE on failure.
      */
     public function discover()
+    {
+        $this->redirectCount = 0;
+        $result = $this->doDiscover();
+
+        return $result;
+    }
+
+
+    /**
+     * Execute the full discovery chain of events in the correct sequence
+     * until a valid response is received, or all methods have failed.
+     *
+     * @return An AUTODISCOVERED_VIA_* constant or FALSE on failure.
+     */
+    public function doDiscover()
     {
         $result = $this->tryAdScp();
 
@@ -302,13 +330,14 @@ class EWSAutodiscover
         	$this->discovered = false;
         }
 
-        // Follow any redirects
-        if($this->redirect)
+        // Redirect if we get a new email address to check
+        if($this->redirect && $this->redirectCount < $this->maxRedirects )
         {
+            $this->redirectCount++;
             $email = $redirectAddr = $this->redirect['redirectAddr'];
             $this->redirect = false;
             $this->setEmail($email);
-            return $this->discover();
+            return $this->doDiscover();
         }
 
         return $result;
@@ -1033,4 +1062,10 @@ class EWSAutodiscover
     		$this->logger->critical($message, $context);
     	}
     }
+
+    protected function SetMaxRedirects($maxRedirects)
+    {
+        $this->maxRedirects = $maxRedirects;
+    }
+
 }
