@@ -753,7 +753,7 @@ class EWSAutodiscover
             CURLOPT_HEADERFUNCTION  => array($this, 'readHeaders'),
             CURLOPT_IPRESOLVE       => CURL_IPRESOLVE_V4,
             CURLOPT_SSL_VERIFYPEER  => true,
-            CURLOPT_SSL_VERIFYHOST  => true
+            CURLOPT_SSL_VERIFYHOST  => 2
         );
 
         // Set the appropriate content-type and content size.
