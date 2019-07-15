@@ -5,8 +5,10 @@
  * @package php-ews
  * @subpackage Exception
  */
-namespace PhpEws;
+namespace jamesiarmes\PhpEws;
+
 use Exception;
+
 /**
  * Exception class for Exchange Web Services
  */
