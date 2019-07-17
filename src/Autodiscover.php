@@ -5,6 +5,8 @@
 
 namespace jamesiarmes\PhpEws;
 
+use Psr\Log\LoggerInterface;
+
 /**
  * Exchange Web Services Autodiscover implementation
  *
@@ -218,6 +220,14 @@ class Autodiscover
      * @var mixed
      */
     public $discovered = null;
+
+    /**
+     * Handle to logger implementing PSR-3 interface
+     * @link https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-3-logger-interface.md
+     *
+     * @var Psr\Log\LoggerInterface;
+     */
+    protected $logger = null;
 
     /**
      * Constructor for the EWSAutodiscover class.
@@ -439,7 +449,13 @@ class Autodiscover
     public function tryTLD()
     {
         $url = 'https://' . $this->tld . self::AUTODISCOVER_PATH;
-        return ($this->tryViaUrl($url) ? self::AUTODISCOVERED_VIA_TLD : false);
+        $result = $this->tryViaUrl($url);
+        if ($result) {
+            return self::AUTODISCOVERED_VIA_TLD;
+        }
+
+        $this->warning('Unable to autodiscover via TLD', array('url' => $url));
+        return false;
     }
 
     /**
@@ -452,9 +468,13 @@ class Autodiscover
     public function trySubdomain()
     {
         $url = 'https://autodiscover.' . $this->tld . self::AUTODISCOVER_PATH;
-        return ($this->tryViaUrl($url)
-            ? self::AUTODISCOVERED_VIA_SUBDOMAIN
-            : false);
+        if ($result) {
+            return self::AUTODISCOVERED_VIA_SUBDOMAIN;
+        }
+
+        $this->warning('Unable to autodiscover via subdomain', array('url' => $url));
+        return false;
+
     }
 
     /**
@@ -494,6 +514,7 @@ class Autodiscover
             }
         }
 
+        $this->warning('Unable to autodiscover via subdomain unauthenticated get', array('url' => $url));
         return false;
     }
 
@@ -517,6 +538,7 @@ class Autodiscover
             }
         }
 
+        $this->warning('Unable to autodiscover via SRV record', array('srvhost' => $srvhost));
         return false;
     }
 
@@ -618,6 +640,9 @@ class Autodiscover
         $this->last_info        = curl_getinfo($ch);
         $this->last_curl_errno  = curl_errno($ch);
         $this->last_curl_error  = curl_error($ch);
+
+        $this->info('NTLM post', array('curl options' => $opts));
+        $this->info('Performed NTLM post', array('last_response' => $this->last_response, 'last_info' => $this->last_info, 'last_error' => $this->last_curl_error));
 
         if ($this->last_curl_errno != CURLE_OK) {
             return false;
@@ -921,4 +946,60 @@ class Autodiscover
         $result = $this->doNTLMPost($url, $timeout);
         return ($result ? true : false);
     }
+
+    /**
+     * Set logger
+     *
+     * @param LoggerInterface $logger
+     */
+    public function setLogger(LoggerInterface $logger)
+    {
+        $this->logger = $logger;
+    }
+
+    protected function debug($message, array $context = array())
+    {
+        if ($this->logger !== null)
+        {
+            $this->logger->debug($message, $context);
+        }
+    }
+
+    protected function info($message, array $context = array())
+    {
+        if ($this->logger !== null)
+        {
+            $this->logger->info($message, $context);
+        }
+    }
+
+    protected function warning($message, array $context = array())
+    {
+        if ($this->logger !== null)
+        {
+            $this->logger->warning($message, $context);
+        }
+    }
+
+    protected function error($message, array $context = array())
+    {
+        if ($this->logger !== null)
+        {
+            $this->logger->error($message, $context);
+        }
+    }
+
+    protected function critical($message, array $context = array())
+    {
+        if ($this->logger !== null)
+        {
+            $this->logger->critical($message, $context);
+        }
+    }
+
+    protected function SetMaxRedirects($maxRedirects)
+    {
+        $this->maxRedirects = $maxRedirects;
+    }
+
 }
