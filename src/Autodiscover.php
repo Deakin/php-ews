@@ -468,6 +468,7 @@ class Autodiscover
     public function trySubdomain()
     {
         $url = 'https://autodiscover.' . $this->tld . self::AUTODISCOVER_PATH;
+        $result = $this->tryViaUrl($url);
         if ($result) {
             return self::AUTODISCOVERED_VIA_SUBDOMAIN;
         }
