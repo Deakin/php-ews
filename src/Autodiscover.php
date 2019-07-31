@@ -606,7 +606,7 @@ class Autodiscover
         $ch = curl_init();
         $opts = array(
             CURLOPT_URL             => $url,
-            CURLOPT_HTTPAUTH        => CURLAUTH_BASIC | CURLAUTH_NTLM,
+            CURLOPT_HTTPAUTH        => CURLAUTH_BASIC,
             CURLOPT_CUSTOMREQUEST   => 'POST',
             CURLOPT_POSTFIELDS      => $this->getAutoDiscoverRequest(),
             CURLOPT_RETURNTRANSFER  => true,
