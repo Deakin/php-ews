@@ -13,7 +13,7 @@
   "require": {
     "php": ">=5.3.0",
     "ext-soap": "*",
-    "jamesiarmes/php-ntlm": "~1.0"
+    "jamesiarmes/php-ntlm": "dev-dev_ews"
   },
   "require-dev": {
     "mustache/mustache": "~2.0",
@@ -21,6 +21,12 @@
     "phpmd/phpmd": "@stable",
     "phan/phan": "@stable"
   },
+  "repositories": [
+    {
+      "type": "vcs",
+      "url":  "https://github.com/Deakin/php-ntlm"
+    }
+  ],
   "config": {
     "bin-dir": "bin"
   },
