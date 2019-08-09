@@ -251,6 +251,19 @@ class Autodiscover
     }
 
     /**
+     * Set's the email to perform the discovery on
+     *
+     * @param string $email
+     */
+    public function setEmail($email)
+    {
+        $this->email = $email;
+        $this->requestxml = null;
+        $this->discovered = null;
+        $this->setTLD();
+    }
+
+    /**
      * Execute the full discovery chain of events in the correct sequence
      * until a valid response is received, or all methods have failed.
      *
