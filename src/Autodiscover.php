@@ -298,7 +298,8 @@ class Autodiscover
                 }
                 continue;
             }
-            $result = $this->$actions[$action]();
+            $autoDiscoveryFunc = $actions[$action];
+            $result = $this->$autoDiscoveryFunc();
             $action++;
         }
 
