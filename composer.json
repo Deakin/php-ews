@@ -13,7 +13,7 @@
   "require": {
     "php": ">=5.3.0",
     "ext-soap": "*",
-    "jamesiarmes/php-ntlm": "~1.0"
+    "jamesiarmes/php-ntlm": "dev-dev_v2ntlm"
   },
   "require-dev": {
     "mustache/mustache": "~2.0",
